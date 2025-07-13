@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task Manager</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f4f7f6;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2a2a2a;
+            text-align: center;
+        }
+        .task-form {
+            display: flex;
+            margin-bottom: 20px;
+        }
+        .task-form input[type="text"] {
+            flex-grow: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        .task-form button {
+            padding: 10px 15px;
+            border: none;
+            background-color: #007bff;
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-left: 10px;
+        }
+        .task-form button:hover {
+            background-color: #0056b3;
+        }
+        .task-list {
+            list-style: none;
+            padding: 0;
+        }
+        .task-item {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        .task-item:last-child {
+            border-bottom: none;
+        }
+        .task-item.completed .task-title {
+            text-decoration: line-through;
+            color: #888;
+        }
+        .task-title {
+            flex-grow: 1;
+            cursor: pointer;
+        }
+        .task-item button {
+            border: none;
+            background: none;
+            cursor: pointer;
+            padding: 5px;
+            font-size: 14px;
+            margin-left: 5px;
+        }
+        .task-item .delete-btn {
+            color: #dc3545;
+        }
+        .task-item .delete-btn:hover {
+            color: #a71d2a;
+        }
+        .task-item .edit-btn {
+            color: #ffc107;
+        }
+        .task-item .edit-btn:hover {
+            color: #d39e00;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Task Manager</h1>
+        <div class="task-form">
+            <input type="text" id="task-input" placeholder="Add a new task...">
+            <button id="add-task-btn">Add Task</button>
+        </div>
+        <ul id="task-list" class="task-list"></ul>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const taskInput = document.getElementById('task-input');
+            const addTaskBtn = document.getElementById('add-task-btn');
+            const taskList = document.getElementById('task-list');
+            let editingTaskId = null;
+
+            const API_URL = '/api/tasks';
+
+            // Fetch and display tasks
+            const fetchTasks = async () => {
+                try {
+                    const response = await fetch(API_URL);
+                    const result = await response.json();
+                    if (result.success) {
+                        taskList.innerHTML = '';
+                        result.data.tasks.forEach(task => {
+                            const li = document.createElement('li');
+                            li.className = `task-item ${task.completed ? 'completed' : ''}`;
+                            li.dataset.id = task._id;
+
+                            const title = document.createElement('span');
+                            title.className = 'task-title';
+                            title.textContent = task.title;
+                            title.addEventListener('click', () => toggleComplete(task._id, !task.completed));
+
+                            const editBtn = document.createElement('button');
+                            editBtn.className = 'edit-btn';
+                            editBtn.textContent = 'Edit';
+                            editBtn.addEventListener('click', () => editTask(task));
+
+                            const deleteBtn = document.createElement('button');
+                            deleteBtn.className = 'delete-btn';
+                            deleteBtn.textContent = 'Delete';
+                            deleteBtn.addEventListener('click', () => deleteTask(task._id));
+
+                            li.appendChild(title);
+                            li.appendChild(editBtn);
+                            li.appendChild(deleteBtn);
+                            taskList.appendChild(li);
+                        });
+                    }
+                } catch (error) {
+                    console.error('Error fetching tasks:', error);
+                }
+            };
+
+            // Add or Update Task
+            const addOrUpdateTask = async () => {
+                const title = taskInput.value.trim();
+                if (!title) return;
+
+                const url = editingTaskId ? `${API_URL}/${editingTaskId}` : API_URL;
+                const method = editingTaskId ? 'PUT' : 'POST';
+
+                try {
+                    const response = await fetch(url, {
+                        method: method,
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ title })
+                    });
+
+                    if (response.ok) {
+                        taskInput.value = '';
+                        editingTaskId = null;
+                        addTaskBtn.textContent = 'Add Task';
+                        fetchTasks();
+                    }
+                } catch (error) {
+                    console.error('Error saving task:', error);
+                }
+            };
+
+            // Delete Task
+            const deleteTask = async (id) => {
+                try {
+                    const response = await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
+                    if (response.ok) {
+                        fetchTasks();
+                    }
+                } catch (error) {
+                    console.error('Error deleting task:', error);
+                }
+            };
+
+            // Toggle Complete
+            const toggleComplete = async (id, completed) => {
+                try {
+                    const response = await fetch(`${API_URL}/${id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ completed })
+                    });
+                    if (response.ok) {
+                        fetchTasks();
+                    }
+                } catch (error) {
+                    console.error('Error updating task status:', error);
+                }
+            };
+            
+            // Edit Task
+            const editTask = (task) => {
+                taskInput.value = task.title;
+                editingTaskId = task._id;
+                addTaskBtn.textContent = 'Update Task';
+                taskInput.focus();
+            };
+
+            addTaskBtn.addEventListener('click', addOrUpdateTask);
+            taskInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    addOrUpdateTask();
+                }
+            });
+
+            fetchTasks();
+        });
+    </script>
+
+</body>
+</html>
