@@ -3,18 +3,66 @@ import AppError from "../utils/AppError.js";
 
 // @route GET /api/tasks
 export const getAllTasks = async (req, res, next) => {
-  const queryObj = {};
-  if (req.query.completed) {
-    queryObj.completed = req.query.completed === "true";
-  }
+
   try {
-    const tasks = await Task.find(queryObj);
+    let query;
+
+    const reqQuery = {...req.query};
+    const excludeFields = ['page', 'sort', 'limit', 'fields', 'search'];
+    
+    excludeFields.forEach(param => delete reqQuery[param]);
+    
+    let queryStr = JSON.stringify(reqQuery);
+    
+    queryStr = queryStr.replace(/\b(gt|gte|lt|lte|in)\b/g, match => `$${match}`);
+    
+    // initial mongoose query
+    query = Task.find(JSON.parse(queryStr));
+
+    //Search (using regex for specific fields like title, description)
+
+    if (req.query.title) {
+      query = query.find({
+        title: { $regex: req.query.title, $options: 'i' }
+      });
+    }
+
+    if (req.query.description) {
+      query = query.find({
+        description: { $regex: req.query.description, $options: 'i' }
+      });
+    }
+
+
+
+    // sorting
+    if (req.query.sort) {
+      const sortBy = req.query.sort.split(',').join(' ');
+      query = query.sort(sortBy);
+    } else{
+      query = query.sort('-createdAt');
+    }
+
+    // Pagination
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 10 // Default limit 10 per page
+    const skip = (page -1) * limit;
+
+    query = query.skip(skip).limit(limit);
+
+    const tasks = await query;
+
+    const totalTasks = await Task.countDocuments(JSON.parse(queryStr)); // count based on filter
+    
     res.status(200).json({
       success: true,
-      data: {
-        tasks,
-      },
-    });
+      count: tasks.length,
+      total: totalTasks,
+      page: page,
+      limit: limit,
+      totalPages: Math.ceil(totalTasks / limit),
+      data: tasks
+  });
   } catch (error) {
     next(error);
   }
