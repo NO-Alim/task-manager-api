@@ -61,6 +61,25 @@ Base URL: `http://localhost:3000/api/tasks`
 -   **Method:** `GET`
 -   **Query Parameters:**
     -   `completed`: (Optional) `true` or `false` to filter tasks by completion status.
+    -   `keyword`: (Optional) A string to search for within task fields.
+    -   `searchBy`: (Optional) Comma-separated list of fields to search (e.g., `title,description`). Defaults to `title` if omitted.
+    -   `sort`: (Optional) Field(s) to sort by. Prepend `-` for descending order (e.g., `title,-createdAt`). Defaults to `-createdAt`.
+    -   `page`: (Optional) Page number for pagination. Defaults to `1`.
+    -   `limit`: (Optional) Number of results per page. Defaults to `10`.
+-   **Search:**
+    Allows keyword-based fuzzy search on one or more specified text fields.
+    Uses case-insensitive partial matching (`$regex`).
+    Controlled by these query parameters:
+    -   `keyword` — the search string.
+    -   `searchBy` — comma-separated list of fields to search (optional).
+        Defaults to searching only the `title` field if `searchBy` is omitted.
+    
+    **Example URLs:**
+    -   `/api/tasks?keyword=hello`
+        Searches for "hello" in the `title` field.
+    -   `/api/tasks?keyword=hello&searchBy=title,description`
+        Searches for "hello" in both `title` and `description` fields.
+
 -   **Success Response:** `200 OK`
 
     ```json
