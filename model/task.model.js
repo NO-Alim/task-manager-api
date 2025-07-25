@@ -20,6 +20,11 @@ const TaskSchema = new mongoose.Schema(
       type: Date,
       require: false,
     },
+    userId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        required: true,
+    }
   },
   { strict: "throw", timestamps: true }
 );

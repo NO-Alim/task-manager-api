@@ -5,16 +5,15 @@ import AppError from "../utils/AppError.js";
 
 // @route GET /api/tasks
 export const getAllTasks = async (req, res, next) => {
-
   try {
-    const features = new ApiFeatures(Task.find(), req.query)
+    const features = new ApiFeatures(Task.find({ userId: req.user.id }), req.query)
     .search(['title', 'description']) // Pass an array of fields that can be searched
     .filter(['completed']) 
     .sort()
     .paginate();
 
       const tasks = await features.query;
-      const countFeatures = new ApiFeatures(Task.find(), req.query).search(['title', 'description']).filter();
+      const countFeatures = new ApiFeatures(Task.find({ userId: req.user.id }), req.query).search(['title', 'description']).filter();
       const totalTasks = await countFeatures.query.countDocuments();
 
 
@@ -25,6 +24,7 @@ res.status(200).json({
             page: parseInt(req.query.page, 10) || 1,
             limit: parseInt(req.query.limit, 10) || 10, 
             totalPages: Math.ceil(totalTasks / (parseInt(req.query.limit, 10) || 10)),
+            userName: req.user.userName, // Add userName to the response
             data: tasks
         });
   } catch (error) {
@@ -35,7 +35,7 @@ res.status(200).json({
 // @route GET /api/tasks/123
 export const getTaskById = async (req, res, next) => {
   const taskId = req.params.id;
-  const task = await Task.findById(taskId);
+  const task = await Task.findOne({ _id: taskId, userId: req.user.id });
 
   try {
     if (!task) {
@@ -55,12 +55,16 @@ export const getTaskById = async (req, res, next) => {
 // @route POST /api/tasks
 
 export const addTask = async (req, res, next) => {
+  const user = req.user;
   const task = req.body;
   if (!task.title) {
     return next(new AppError("Missing Require Fields", 400));
   }
   try {
-    const newTask = new Task(task);
+    const newTask = new Task({
+      ...task,
+      userId: req.user.id,
+    });
     await newTask.save();
     res.status(201).json({
       success: true,
@@ -81,9 +85,14 @@ export const addTask = async (req, res, next) => {
 export const updateTask = async (req, res, next) => {
   try {
     const task = req.body;
-    const updatedTask = await Task.findByIdAndUpdate(req.params.id, task, {
-      new: true,
-    });
+    const updatedTask = await Task.findOneAndUpdate(
+      { _id: req.params.id, userId: req.user.id },
+      task,
+      {
+        new: true,
+        runValidators: true,
+      }
+    );
     if (!updatedTask) {
       next(new AppError("Task not Found", 404));
     }
@@ -105,7 +114,7 @@ export const updateTask = async (req, res, next) => {
 
 export const deleteTaskById = async (req, res, next) => {
   try {
-    const task = await Task.findByIdAndDelete(req.params.id);
+    const task = await Task.findOneAndDelete({ _id: req.params.id, userId: req.user.id });
 
     if (!task) {
       return next(new AppError("Task Not Found", 404));
